@@ -6,12 +6,12 @@ Open spacebeat.html with live server. To do this in visual studio code, you can 
 
 ### Features
 - golden rocket gives user bonus points
-- time rocket gives additional time bonus for round
+- time rocket gives user additional time bonus for round
 - animation for rockets on click
 
 
 ### Assets
-all assets were created using gimp.
+All assets were created using gimp.
 
 https://pinnguaq.com/learn/pixel-art/pixel-art-1-getting-started-with-gimp/
 https://www.maketecheasier.com/create-space-scenes-in-gimp/
