@@ -1,0 +1,306 @@
+<!doctype html> 
+<html lang="en"> 
+<head> 
+    <meta charset="UTF-8" />
+    <title>Spacebeat</title>
+    <script src="//cdn.jsdelivr.net/npm/phaser@3.11.0/dist/phaser.js"></script>
+    <style type="text/css">
+        body {
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+
+<script type="text/javascript">
+    ///////////////////////
+    // Setup
+    var scale = 1.5;
+
+    var config = {
+        type: Phaser.AUTO,
+        width: 240 * scale,
+        height: 400 * scale,
+        scene: {
+            preload: preload,
+            create: create,
+            update: update
+        }
+    };
+
+    var game = new Phaser.Game(config);
+
+    ////////////////////////
+    // coordinates to generate rockets. will scale according to canvas config size 
+    var mCoord = [[66,172],
+            [120,173],
+            [174,172],
+            [42,214],
+            [90,214],
+            [148,214],
+            [199,214],
+            [61,257],
+            [123,257],
+            [31,308],
+            [94,308],
+            [149,308],
+            [208,308]];
+
+    // global variables
+    var scoreText;
+    var updatedSpeed = false;
+    var gameState = true;
+    var timerocket = false;
+    var timeSess = maxTimeSession;
+    var score = 0;
+    
+    // configurable parameters
+    var maxTimeSession = 10;
+    var timeSess = maxTimeSession;
+    var timeBonus = 3;
+
+
+    var mouseSensitivity = 50; //pixel sensitivity for mouse click radius
+
+    function preload ()
+    {
+        this.load.image('background', 'space-asset/background.png');
+
+        //space animation
+        this.load.image('m1', 'space-asset/animations/normal-spaceship/1.png');
+        this.load.image('m2', 'space-asset/animations/normal-spaceship/2.png');
+        this.load.image('m3', 'space-asset/animations/normal-spaceship/3.png');
+        this.load.image('m4', 'space-asset/animations/normal-spaceship/4.png');
+        this.load.image('m5', 'space-asset/animations/normal-spaceship/4.png');
+        
+        this.load.image('tm1', 'space-asset/animations/time-spaceship/1.png');
+        this.load.image('tm2', 'space-asset/animations/time-spaceship/2.png');
+        this.load.image('tm3', 'space-asset/animations/time-spaceship/3.png');
+        this.load.image('tm4', 'space-asset/animations/time-spaceship/4.png');
+        this.load.image('tm5', 'space-asset/animations/time-spaceship/4.png');
+
+
+    }
+
+    function create ()
+    {
+        // set background
+        let background = this.add.image(config.width/2, config.height/2, 'background');
+        background.setScale(scale);
+
+        /////////////////
+        // Msg 
+        // score msg
+        scoreText = this.add.text(16, 16, 'score: 0', { fontSize: '12px', fill: '#FFF', backgroundColor: '#000'});
+        timeText = this.add.text(config.width - 130, 16, 'time remaining: ' + maxTimeSession, { fontSize: '12px', fill: '#FFF', backgroundColor: '#000'});
+
+        // start msg
+        startMsg = this.add.text(config.width/2, config.height/2, "Start! " , { fontSize: '20px', fill: '#FFF', backgroundColor: '#000'}).setOrigin(0.5);
+        this.startGameMsgTimer = this.time.addEvent({ delay: 500, callback: destroyStartMsg, callbackScope: this});
+
+        // end msg
+        endMsg1 = this.add.text(config.width/2, config.height/2-20, "",  { fontSize: '20px', fill: '#FFF', backgroundColor: '#000'}).setOrigin(0.5);
+        endMsg2 = this.add.text(config.width/2, config.height/2, "", { fontSize: '20px', fill: '#FFF', backgroundColor: '#000'}).setOrigin(0.5);
+        
+        this.rocketGroup = this.add.group();
+
+        //////////////////////
+        // anims setup
+        this.anims.create({
+            key: 'pullup-m',
+            frames: [
+                { key: 'm1' },
+                { key: 'm2' },
+                { key: 'm3' },
+                { key: 'm4' },
+                { key: 'm5', duration: 4 }
+            ],
+            frameRate: 8,
+            repeat: 0
+        });
+
+        this.anims.create({
+            key: 'pullup-tm',
+            frames: [
+                { key: 'tm1' },
+                { key: 'tm2' },
+                { key: 'tm3' },
+                { key: 'tm4' },
+                { key: 'tm5', duration: 4 }
+            ],
+            frameRate: 8,
+            repeat: 0
+        });
+
+        //////////////////
+        // Timers
+        // timer to generate rockets
+        this.timer = this.time.addEvent({ delay: 2000, callback: generateRocketSet, callbackScope: this, loop:true });
+
+        // timer for end condition
+        this.endGameTimer = this.time.addEvent({ delay: maxTimeSession *1000, callback: stopGame, callbackScope: this})
+
+    }
+
+    
+
+    function generateRocketSet(){
+        if(gameState){
+            rocketGroup = this.rocketGroup;
+            endGameTimer = this.endGameTimer;
+            
+            //if time is up and the rocket has not been clicked, clear the rocket
+            rocketGroup.clear(true);
+            var visiblerocket = randomGenerateSetOfNumber(3,mCoord.length);
+            for (var i=0; i<visiblerocket.length; i++){
+                selectedMCoord = visiblerocket[i];
+                //set special rocket in every round  - either golden rocket or time rocket
+                var spriteImage = "m1";
+                var randomZeroOrOne = 3;
+                // change sprite image
+                if  (i==0)  {
+                    randomZeroOrOne = Math.floor(Math.random() * 2);
+                    // randomZeroOrOne = 1;
+                    if (randomZeroOrOne == 1){  //timerocket
+                        spriteImage = "tm1";
+                    }     
+                }
+                //sprite setup
+                var rocket = this.add.sprite(mCoord[selectedMCoord][0] * scale, mCoord[selectedMCoord][1] * scale,spriteImage);
+                
+                rocketGroup.add(rocket);
+                rocket.setScale(2);
+                
+                // special rocket status setup
+                rocket.goldenrocket = false;
+                rocket.timerocket = false;
+
+                //set special rocket in every round  - either golden rocket or time rocket
+                if (randomZeroOrOne == 0){  //set as golden rocket
+                    rocket.goldenrocket = true;
+                    rocket.setTint(0xd912fb);  // purple colour
+                } 
+
+                if (randomZeroOrOne == 1){  //set as golden rocket
+                    rocket.timerocket = true;
+                } 
+
+                rocket.setInteractive();
+                
+                rocket.on('pointerdown', function (pointer) {
+                    if (this.goldenrocket){
+                        score +=  10;
+                        this.play('pullup-m');
+                    } else if (this.timerocket) {
+                        //don't need to update score
+                        //change timing of loop
+                        timerocket = true;
+                        this.play('pullup-tm');
+                    } else{
+                        score +=  1;
+                        this.play('pullup-m');
+                    }
+                    
+                    scoreText.setText("score: " + score);
+                });
+            }
+        }
+        return;
+    }
+
+
+    function update ()
+    {
+        if( gameState) {
+            if (timerocket) { 
+                calcuateTimerForTimeRocket();
+                timerocket = false;
+            }
+            timeElapsed = this.endGameTimer.elapsed/1000 ;
+            timeElapsed = this.endGameTimer.getElapsedSeconds();
+            timeRemaining = Math.ceil(timeSess-timeElapsed);
+            timeText.setText('time remaining: ' + timeRemaining);
+        }
+    }
+
+    ///////////////////////
+    // utils 
+
+
+    function randomGenerateSetOfNumber(noOfResponse, range){
+        return Array.from( new Set(Array.from({length: noOfResponse}, () => Math.floor(Math.random() * range))));
+    }
+
+    function calcuateTimerForTimeRocket(){
+        endGameTimer = this.endGameTimer;
+        timeSess += timeBonus;
+        timeElapsed = this.endGameTimer.getElapsedSeconds();
+        timeRemaining = timeSess - timeElapsed;
+        // minus time elapsed on previous timer before resetting timer
+        timeSess = timeRemaining; 
+        this.endGameTimer.reset({ delay: timeRemaining *1000, callback: stopGame, callbackScope: this});
+        timeText.setText('time remaining: ' + timeRemaining);
+    }
+
+    function destroyStartMsg(){
+        startMsg.destroy();
+    }
+
+    function stopGame(){
+        gameState=false;
+        timeText.setText('time remaining: 0' );
+
+        // clear rocket sprites on screen
+        rocketGroup = this.rocketGroup;
+        rocketGroup.clear(true);
+
+        endMsg1.setText("Game has Ended.");
+        endMsg2.setText("score: " + score);
+    }
+
+    //////////////////
+    // redacted features 
+
+    // recursive function to generate rockets when screen is cleared of rockets
+    // function rocketGone(x,rocketGroup){
+    //     if (rocketGroup.countActive(true)==0){
+    //         var visiblerocket = randomGenerateSetOfNumber(3,mCoord.length-1);
+    //         for (var i=0; i<visiblerocket.length; i++){
+    //             selectedMCoord = visiblerocket[i];
+    //             var rocket = x.add.sprite(mCoord[selectedMCoord][0] * scale, mCoord[selectedMCoord][1] * scale,'rocket');
+    //             rocketGroup.add(rocket);
+    //             rocket.setScale(0.3);
+    //             rocket.setCrop(0,0,rocket.height,rocket.width/2);
+
+    //             //golden rocket
+    //             rocket.goldenrocket = false;
+
+    //             //set special rocket in every round
+    //             if  (i==0)  {
+    //                 rocket.goldenrocket = true;
+    //                 // rocket.setTint(0xff0000);
+    //                 rocket.setTint(0xffd700);
+    //             }
+    //             rocket.setInteractive();
+                
+    //             rocket.on('pointerdown', function (pointer) {
+    //                 if (this.goldenrocket){
+    //                     score +=  10;
+    //                 }else{
+    //                     score +=  1;
+    //                 }
+    //                 scoreText.setText("Score: " + score);
+    //                 // this.clearTint();
+    //                 this.destroy();
+    //                 rocketGone(x,rocketGroup);
+    //             });
+    //         }
+    //     }
+    //     return;
+
+
+
+</script>
+
+</body>
+</html>
